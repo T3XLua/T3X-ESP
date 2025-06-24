@@ -11,6 +11,9 @@ local function createESP(character)
         highlight.Adornee = character
         highlight.FillColor = Color3.fromRGB(255, 0, 0)
         highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- Makes it visible regardless of team or walls
         highlight.Parent = character
 
         -- Billboard GUI for name
@@ -48,7 +51,6 @@ end
 -- Listen for players joining or respawning
 Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function(character)
-        -- Slight delay to ensure character is fully loaded
         task.wait(1)
         createESP(character)
     end)
@@ -56,4 +58,5 @@ end)
 
 -- Initial ESP
 game:GetService("RunService").RenderStepped:Connect(applyESP)
+
 
