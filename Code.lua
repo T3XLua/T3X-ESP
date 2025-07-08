@@ -8,7 +8,6 @@ local Window = Rayfield:CreateWindow({
     ShowText = "Rayfield",
     Theme = "Default",
     ToggleUIKeybind = "K",
-
     ConfigurationSaving = {
         Enabled = true,
         FolderName = nil,
@@ -72,14 +71,12 @@ local Toggle = MainTab:CreateToggle({
         ESPEnabled = Value
 
         if ESPEnabled then
-            -- Apply ESP to all players
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= LocalPlayer and player.Character then
                     createESP(player.Character)
                 end
             end
 
-            -- Listen for players joining
             Players.PlayerAdded:Connect(function(player)
                 player.CharacterAdded:Connect(function(character)
                     task.wait(1)
@@ -89,7 +86,6 @@ local Toggle = MainTab:CreateToggle({
                 end)
             end)
 
-            -- Continuous ESP check
             ESPConnection = game:GetService("RunService").RenderStepped:Connect(function()
                 for _, player in ipairs(Players:GetPlayers()) do
                     if player ~= LocalPlayer and player.Character then
@@ -98,7 +94,6 @@ local Toggle = MainTab:CreateToggle({
                 end
             end)
         else
-            -- Disable ESP highlights
             for _, player in ipairs(Players:GetPlayers()) do
                 if player.Character and player.Character:FindFirstChild("Highlight") then
                     player.Character.Highlight:Destroy()
@@ -108,7 +103,6 @@ local Toggle = MainTab:CreateToggle({
                 end
             end
 
-            -- Disconnect ESP loop
             if ESPConnection then
                 ESPConnection:Disconnect()
                 ESPConnection = nil
@@ -144,6 +138,41 @@ local JumpSlider = ModsTab:CreateSlider({
     Callback = function(Value)
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
             LocalPlayer.Character.Humanoid.JumpPower = Value
+        end
+    end,
+})
+
+-- Kick Player Section
+local KickSection = ModsTab:CreateSection("Kick Player")
+
+local UsernameToKick = ""
+
+local KickTextbox = ModsTab:CreateInput({
+    Name = "Username to Kick",
+    PlaceholderText = "Enter username...",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text)
+        UsernameToKick = Text
+    end,
+})
+
+local KickButton = ModsTab:CreateButton({
+    Name = "Kick Player",
+    Callback = function()
+        local targetPlayer = Players:FindFirstChild(UsernameToKick)
+        if targetPlayer then
+            targetPlayer:Kick("You have been kicked by the host.")
+            Rayfield:Notify({
+                Title = "Player Kicked",
+                Content = UsernameToKick .. " has been kicked.",
+                Duration = 3
+            })
+        else
+            Rayfield:Notify({
+                Title = "Player Not Found",
+                Content = "No player with the username '" .. UsernameToKick .. "' was found.",
+                Duration = 3
+            })
         end
     end,
 })
