@@ -17,6 +17,7 @@ local Window = Rayfield:CreateWindow({
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local camera = workspace.CurrentCamera
 
 -- Main Tab (ESP)
 local MainTab = Window:CreateTab("ESP", 120763171259943)
@@ -63,7 +64,7 @@ end
 local ESPEnabled = false
 local ESPConnection = nil
 
-local Toggle = MainTab:CreateToggle({
+MainTab:CreateToggle({
     Name = "Enable ESP",
     CurrentValue = false,
     Flag = "ESP_Toggle",
@@ -114,7 +115,7 @@ local Toggle = MainTab:CreateToggle({
 -- Player Mods Tab (Speed & Jump Sliders)
 local ModsTab = Window:CreateTab("Player Mods", 120763171259943)
 
-local SpeedSlider = ModsTab:CreateSlider({
+ModsTab:CreateSlider({
     Name = "WalkSpeed",
     Range = {16, 100},
     Increment = 1,
@@ -128,7 +129,7 @@ local SpeedSlider = ModsTab:CreateSlider({
     end,
 })
 
-local JumpSlider = ModsTab:CreateSlider({
+ModsTab:CreateSlider({
     Name = "JumpPower",
     Range = {50, 200},
     Increment = 1,
@@ -143,11 +144,11 @@ local JumpSlider = ModsTab:CreateSlider({
 })
 
 -- Kick Player Section
-local KickSection = ModsTab:CreateSection("Kick Player")
+ModsTab:CreateSection("Kick Player")
 
 local UsernameToKick = ""
 
-local KickTextbox = ModsTab:CreateInput({
+ModsTab:CreateInput({
     Name = "Username to Kick",
     PlaceholderText = "Enter username...",
     RemoveTextAfterFocusLost = false,
@@ -156,7 +157,7 @@ local KickTextbox = ModsTab:CreateInput({
     end,
 })
 
-local KickButton = ModsTab:CreateButton({
+ModsTab:CreateButton({
     Name = "Kick Player",
     Callback = function()
         local targetPlayer = Players:FindFirstChild(UsernameToKick)
@@ -177,9 +178,9 @@ local KickButton = ModsTab:CreateButton({
     end,
 })
 
--- 🔒 Auto Lock-On System
-local RunService = game:GetService("RunService")
-local camera = workspace.CurrentCamera
+-- Lock-On System Toggle
+local lockOnEnabled = false
+local lockOnConnection = nil
 local lockOnTarget = nil
 
 local MAX_DISTANCE = 100
@@ -233,17 +234,35 @@ local function getNearestEnemy()
     return closest
 end
 
-RunService.RenderStepped:Connect(function()
-    local newTarget = getNearestEnemy()
-    if newTarget and newTarget:FindFirstChild("HumanoidRootPart") then
-        lockOnTarget = newTarget
-        local targetPos = lockOnTarget.HumanoidRootPart.Position
-        local camPos = camera.CFrame.Position
-        camera.CFrame = CFrame.new(camPos, targetPos)
-    else
-        lockOnTarget = nil
-    end
-end)
+ModsTab:CreateToggle({
+    Name = "Enable Lock-On",
+    CurrentValue = false,
+    Flag = "LockOnToggle",
+    Callback = function(Value)
+        lockOnEnabled = Value
+
+        if lockOnEnabled then
+            lockOnConnection = game:GetService("RunService").RenderStepped:Connect(function()
+                local newTarget = getNearestEnemy()
+                if newTarget and newTarget:FindFirstChild("HumanoidRootPart") then
+                    lockOnTarget = newTarget
+                    local targetPos = lockOnTarget.HumanoidRootPart.Position
+                    local camPos = camera.CFrame.Position
+                    camera.CFrame = CFrame.new(camPos, targetPos)
+                else
+                    lockOnTarget = nil
+                end
+            end)
+        else
+            if lockOnConnection then
+                lockOnConnection:Disconnect()
+                lockOnConnection = nil
+            end
+            lockOnTarget = nil
+        end
+    end,
+})
+
 
 
 
