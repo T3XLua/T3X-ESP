@@ -177,5 +177,73 @@ local KickButton = ModsTab:CreateButton({
     end,
 })
 
+-- 🔒 Auto Lock-On System
+local RunService = game:GetService("RunService")
+local camera = workspace.CurrentCamera
+local lockOnTarget = nil
+
+local MAX_DISTANCE = 100
+local LOCK_RADIUS = 50
+
+local function getEnemies()
+    local enemies = {}
+    for _, model in pairs(workspace:GetChildren()) do
+        if model:IsA("Model") and model:FindFirstChild("Humanoid") and model ~= LocalPlayer.Character then
+            table.insert(enemies, model)
+        end
+    end
+    return enemies
+end
+
+local function hasLineOfSight(target)
+    local origin = camera.CFrame.Position
+    local targetPart = target:FindFirstChild("HumanoidRootPart")
+    if not targetPart then return false end
+
+    local direction = (targetPart.Position - origin)
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+
+    local result = workspace:Raycast(origin, direction, rayParams)
+    return result and result.Instance and result.Instance:IsDescendantOf(target)
+end
+
+local function getNearestEnemy()
+    local closest = nil
+    local closestDistance = MAX_DISTANCE
+
+    for _, enemy in ipairs(getEnemies()) do
+        local hrp = enemy:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local distance = (hrp.Position - camera.CFrame.Position).Magnitude
+            if distance <= closestDistance then
+                local direction = (hrp.Position - camera.CFrame.Position).Unit
+                local dot = camera.CFrame.LookVector:Dot(direction)
+                if dot > math.cos(math.rad(LOCK_RADIUS)) then
+                    if hasLineOfSight(enemy) then
+                        closestDistance = distance
+                        closest = enemy
+                    end
+                end
+            end
+        end
+    end
+
+    return closest
+end
+
+RunService.RenderStepped:Connect(function()
+    local newTarget = getNearestEnemy()
+    if newTarget and newTarget:FindFirstChild("HumanoidRootPart") then
+        lockOnTarget = newTarget
+        local targetPos = lockOnTarget.HumanoidRootPart.Position
+        local camPos = camera.CFrame.Position
+        camera.CFrame = CFrame.new(camPos, targetPos)
+    else
+        lockOnTarget = nil
+    end
+end)
+
 
 
