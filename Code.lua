@@ -1,7 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "ESP, SpeedHack, JumpHack",
+    Name = "ESP, SpeedHack, JumpHack, LockOn",
     Icon = 0,
     LoadingTitle = "Loading...",
     LoadingSubtitle = "by dizzy",
@@ -17,7 +17,7 @@ local Window = Rayfield:CreateWindow({
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
 
 -- Main Tab (ESP)
 local MainTab = Window:CreateTab("ESP", 120763171259943)
@@ -64,7 +64,7 @@ end
 local ESPEnabled = false
 local ESPConnection = nil
 
-MainTab:CreateToggle({
+local ToggleESP = MainTab:CreateToggle({
     Name = "Enable ESP",
     CurrentValue = false,
     Flag = "ESP_Toggle",
@@ -87,7 +87,7 @@ MainTab:CreateToggle({
                 end)
             end)
 
-            ESPConnection = game:GetService("RunService").RenderStepped:Connect(function()
+            ESPConnection = RunService.RenderStepped:Connect(function()
                 for _, player in ipairs(Players:GetPlayers()) do
                     if player ~= LocalPlayer and player.Character then
                         createESP(player.Character)
@@ -112,10 +112,10 @@ MainTab:CreateToggle({
     end
 })
 
--- Player Mods Tab (Speed & Jump Sliders)
+-- Player Mods Tab (Speed & Jump Sliders + Lock-On)
 local ModsTab = Window:CreateTab("Player Mods", 120763171259943)
 
-ModsTab:CreateSlider({
+local SpeedSlider = ModsTab:CreateSlider({
     Name = "WalkSpeed",
     Range = {16, 100},
     Increment = 1,
@@ -129,7 +129,7 @@ ModsTab:CreateSlider({
     end,
 })
 
-ModsTab:CreateSlider({
+local JumpSlider = ModsTab:CreateSlider({
     Name = "JumpPower",
     Range = {50, 200},
     Increment = 1,
@@ -143,12 +143,79 @@ ModsTab:CreateSlider({
     end,
 })
 
+-- Auto Lock-On Logic --
+
+local lockOnEnabled = false
+local lockOnConnection
+
+local function getNearestEnemy()
+    local closestEnemy = nil
+    local shortestDistance = math.huge
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
+
+    local hrp = character.HumanoidRootPart
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local enemyHRP = player.Character.HumanoidRootPart
+            local distance = (enemyHRP.Position - hrp.Position).Magnitude
+            if distance < shortestDistance then
+                shortestDistance = distance
+                closestEnemy = player.Character
+            end
+        end
+    end
+
+    return closestEnemy
+end
+
+local function rotateCharacterToTarget(targetPos)
+    local character = LocalPlayer.Character
+    if not character then return end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local lookVector = (targetPos - hrp.Position)
+    lookVector = Vector3.new(lookVector.X, 0, lookVector.Z)
+    if lookVector.Magnitude == 0 then return end
+    lookVector = lookVector.Unit
+
+    local targetCFrame = CFrame.new(hrp.Position, hrp.Position + lookVector)
+    hrp.CFrame = targetCFrame
+end
+
+local function onRenderStep()
+    local target = getNearestEnemy()
+    if target and target:FindFirstChild("HumanoidRootPart") then
+        local targetPos = target.HumanoidRootPart.Position
+        rotateCharacterToTarget(targetPos)
+    end
+end
+
+local LockOnToggle = ModsTab:CreateToggle({
+    Name = "Auto Lock-On",
+    CurrentValue = false,
+    Flag = "LockOnToggle",
+    Callback = function(value)
+        lockOnEnabled = value
+        if lockOnEnabled then
+            lockOnConnection = RunService.RenderStepped:Connect(onRenderStep)
+        else
+            if lockOnConnection then
+                lockOnConnection:Disconnect()
+                lockOnConnection = nil
+            end
+        end
+    end
+})
+
 -- Kick Player Section
-ModsTab:CreateSection("Kick Player")
+local KickSection = ModsTab:CreateSection("Kick Player")
 
 local UsernameToKick = ""
 
-ModsTab:CreateInput({
+local KickTextbox = ModsTab:CreateInput({
     Name = "Username to Kick",
     PlaceholderText = "Enter username...",
     RemoveTextAfterFocusLost = false,
@@ -157,7 +224,7 @@ ModsTab:CreateInput({
     end,
 })
 
-ModsTab:CreateButton({
+local KickButton = ModsTab:CreateButton({
     Name = "Kick Player",
     Callback = function()
         local targetPlayer = Players:FindFirstChild(UsernameToKick)
@@ -178,90 +245,6 @@ ModsTab:CreateButton({
     end,
 })
 
--- Lock-On System Toggle
-local lockOnEnabled = false
-local lockOnConnection = nil
-local lockOnTarget = nil
-
-local MAX_DISTANCE = 100
-local LOCK_RADIUS = 50
-
-local function getEnemies()
-    local enemies = {}
-    for _, model in pairs(workspace:GetChildren()) do
-        if model:IsA("Model") and model:FindFirstChild("Humanoid") and model ~= LocalPlayer.Character then
-            table.insert(enemies, model)
-        end
-    end
-    return enemies
-end
-
-local function hasLineOfSight(target)
-    local origin = camera.CFrame.Position
-    local targetPart = target:FindFirstChild("HumanoidRootPart")
-    if not targetPart then return false end
-
-    local direction = (targetPart.Position - origin)
-    local rayParams = RaycastParams.new()
-    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-
-    local result = workspace:Raycast(origin, direction, rayParams)
-    return result and result.Instance and result.Instance:IsDescendantOf(target)
-end
-
-local function getNearestEnemy()
-    local closest = nil
-    local closestDistance = MAX_DISTANCE
-
-    for _, enemy in ipairs(getEnemies()) do
-        local hrp = enemy:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            local distance = (hrp.Position - camera.CFrame.Position).Magnitude
-            if distance <= closestDistance then
-                local direction = (hrp.Position - camera.CFrame.Position).Unit
-                local dot = camera.CFrame.LookVector:Dot(direction)
-                if dot > math.cos(math.rad(LOCK_RADIUS)) then
-                    if hasLineOfSight(enemy) then
-                        closestDistance = distance
-                        closest = enemy
-                    end
-                end
-            end
-        end
-    end
-
-    return closest
-end
-
-ModsTab:CreateToggle({
-    Name = "Enable Lock-On",
-    CurrentValue = false,
-    Flag = "LockOnToggle",
-    Callback = function(Value)
-        lockOnEnabled = Value
-
-        if lockOnEnabled then
-            lockOnConnection = game:GetService("RunService").RenderStepped:Connect(function()
-                local newTarget = getNearestEnemy()
-                if newTarget and newTarget:FindFirstChild("HumanoidRootPart") then
-                    lockOnTarget = newTarget
-                    local targetPos = lockOnTarget.HumanoidRootPart.Position
-                    local camPos = camera.CFrame.Position
-                    camera.CFrame = CFrame.new(camPos, targetPos)
-                else
-                    lockOnTarget = nil
-                end
-            end)
-        else
-            if lockOnConnection then
-                lockOnConnection:Disconnect()
-                lockOnConnection = nil
-            end
-            lockOnTarget = nil
-        end
-    end,
-})
 
 
 
